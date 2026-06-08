@@ -1,0 +1,112 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Plan {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum WinnerStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum DrawType {
+  THREE_MATCH
+  FOUR_MATCH
+  FIVE_MATCH
+}
+
+model User {
+  id                  String         @id // Matches Supabase Auth User ID
+  fullName            String?
+  email               String         @unique
+  role                Role           @default(USER)
+  avatar              String?
+  donationPercentage  Int            @default(10) // Min 10%
+  selectedCharityId   String?
+  selectedCharity     Charity?       @relation(fields: [selectedCharityId], references: [id])
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  subscriptions       Subscription[]
+  scores              Score[]
+  winners             Winner[]
+}
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  userId               String
+  user                 User               @relation(fields: [userId], references: [id])
+  plan                 Plan
+  status               SubscriptionStatus
+  amount               Float
+  stripeCustomerId     String?
+  stripeSubscriptionId String?            @unique
+  startDate            DateTime?
+  endDate              DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
+
+model Charity {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  image       String   @default("https://images.unsplash.com/photo-1542601906990-b4d3fb778b09")
+  website     String?
+  featured    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  users       User[]
+}
+
+model Score {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score     Int // Must be validated between 1 and 45
+  scoreDate DateTime
+  createdAt DateTime @default(now())
+}
+
+model Draw {
+  id          String    @id @default(uuid())
+  month       Int
+  year        Int
+  drawType    DrawType  @default(FIVE_MATCH)
+  drawNumbers Int[] // Store array of draw numbers (e.g. 5 numbers between 1-45)
+  published   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  winners     Winner[]
+}
+
+model Winner {
+  id          String       @id @default(uuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id])
+  drawId      String
+  draw        Draw         @relation(fields: [drawId], references: [id])
+  matchCount  Int // 3, 4, or 5 matches
+  prizeAmount Float
+  status      WinnerStatus @default(PENDING)
+  proofImage  String?
+  createdAt   DateTime     @default(now())
+}
