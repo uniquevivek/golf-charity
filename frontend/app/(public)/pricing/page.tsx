@@ -5,9 +5,10 @@ import { api } from '../../../lib/api';
 import { Check, ShieldCheck, CreditCard } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import Script from 'next/script';
 
 export default function PricingPage() {
-  const { isAuthenticated, token } = useAuthStore();
+  const { isAuthenticated, token, user } = useAuthStore();
   const router = useRouter();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,18 +25,61 @@ export default function PricingPage() {
     try {
       const data = await api.post('/subscriptions/checkout', { plan });
       
-      // If Stripe priceId was a mock placeholder or Stripe was not set up, it returns sandbox: true
       if (data.sandbox) {
-        alert(`Sandbox Mode: Mock ${plan} subscription activated successfully in local DB!`);
+        alert(`Sandbox Mode: Mock ${plan} subscription activated successfully!`);
         router.push('/dashboard');
-      } else if (data.url) {
-        // Redirect to Stripe checkout
-        window.location.href = data.url;
+        return;
       }
+
+      if (!(window as any).Razorpay) {
+        throw new Error('Razorpay Checkout SDK is not loaded yet. Please wait a moment.');
+      }
+
+      const options = {
+        key: data.keyId,
+        amount: data.amount,
+        currency: data.currency,
+        name: 'Golf Charity Platform',
+        description: `${plan} Subscription Plan`,
+        order_id: data.orderId,
+        handler: async function (response: any) {
+          setLoadingPlan(plan);
+          try {
+            await api.post('/subscriptions/verify-payment', {
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpaySignature: response.razorpay_signature,
+              plan,
+              amount: plan === 'MONTHLY' ? 29 : 290,
+            });
+
+            alert('Payment verified & subscription activated successfully!');
+            router.push('/dashboard');
+          } catch (err: any) {
+            setError(err.message || 'Payment verification failed.');
+          } finally {
+            setLoadingPlan(null);
+          }
+        },
+        prefill: {
+          email: user?.email || '',
+          name: user?.fullName || '',
+        },
+        theme: {
+          color: '#10b981',
+        },
+        modal: {
+          ondismiss: function () {
+            setLoadingPlan(null);
+          }
+        }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Failed to start Stripe checkout session');
-    } finally {
+      setError(err.message || 'Failed to start Razorpay checkout session');
       setLoadingPlan(null);
     }
   };
@@ -156,11 +200,18 @@ export default function PricingPage() {
         </div>
       </div>
 
+      {/* Script block to load Razorpay in client browser */}
+      <Script
+        id="razorpay-pricing-sdk"
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        strategy="lazyOnload"
+      />
+
       {/* Safety Notice */}
       <div className="p-4 rounded-2xl bg-white/5 border border-white/5 flex items-center gap-3 w-full max-w-xl text-center justify-center mt-6">
         <ShieldCheck className="text-primary flex-shrink-0" size={18} />
         <p className="text-xs text-muted-foreground leading-relaxed">
-          We use Stripe for secure tokenized payments. We never store credit card numbers on our server. Cancel your subscription billing at any time from your account settings.
+          We use Razorpay for secure payments. We never store credit card numbers on our server. Cancel your subscription billing at any time from your account settings.
         </p>
       </div>
     </div>

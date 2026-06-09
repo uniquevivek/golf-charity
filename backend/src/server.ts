@@ -4,7 +4,6 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import router from './routes';
-import { handleStripeWebhook } from './controllers/stripe.controller';
 
 // Load environment variables
 dotenv.config();
@@ -12,12 +11,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// 1. Stripe Webhook (MUST be registered before express.json() to capture raw body)
-app.post(
-  '/api/subscriptions/webhook',
-  express.raw({ type: 'application/json' }),
-  handleStripeWebhook
-);
+
 
 // 2. Global Security & Utility Middlewares
 app.use(helmet({

@@ -97,7 +97,7 @@ export default function UserSettingsPage() {
           </h3>
           <ul className="space-y-3 text-xs text-muted-foreground leading-relaxed">
             <li>
-              🔐 **Secure Transactions:** Payments are encrypted and processed by Stripe. We do not store full card credentials.
+              🔐 **Secure Transactions:** Payments are encrypted and processed by Razorpay. We do not store full card credentials.
             </li>
             <li>
               ⚡ **Grace Period:** If cancelled, your subscription remains active for score logging and draws until the end of the paid cycle.

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth, requireAdmin } from '../middleware/auth.middleware';
 import * as scoresController from '../controllers/scores.controller';
 import * as charityController from '../controllers/charity.controller';
-import * as stripeController from '../controllers/stripe.controller';
+import * as razorpayController from '../controllers/razorpay.controller';
 import * as drawController from '../controllers/draw.controller';
 import * as winnerController from '../controllers/winner.controller';
 import * as adminController from '../controllers/admin.controller';
@@ -41,11 +41,12 @@ router.put('/charities/:id', requireAuth, requireAdmin, charityController.update
 router.delete('/charities/:id', requireAuth, requireAdmin, charityController.deleteCharity);
 
 // ==========================================
-// Stripe Subscription Billing Routes
+// Razorpay Subscription Billing Routes
 // ==========================================
-router.post('/subscriptions/checkout', requireAuth, stripeController.createCheckoutSession);
-router.post('/subscriptions/cancel', requireAuth, stripeController.cancelSubscription);
-// Note: Webhook is mounted directly on the App in server.ts to preserve raw body signature check.
+router.get('/subscriptions/active', requireAuth, razorpayController.getActiveSubscription);
+router.post('/subscriptions/checkout', requireAuth, razorpayController.createOrder);
+router.post('/subscriptions/verify-payment', requireAuth, razorpayController.verifyPayment);
+router.post('/subscriptions/cancel', requireAuth, razorpayController.cancelSubscription);
 
 // ==========================================
 // Draw Routes

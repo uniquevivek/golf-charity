@@ -52,6 +52,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { label: 'Monthly Draws', href: '/dashboard/draws', icon: <TrendingUp size={18} /> },
     { label: 'My Winnings', href: '/dashboard/winnings', icon: <Award size={18} /> },
     { label: 'Billing Settings', href: '/dashboard/settings', icon: <Settings size={18} /> },
+    { label: 'Payment Testing', href: '/dashboard/test-payment', icon: <Coins size={18} /> },
   ];
 
   const isActive = (href: string) => {
