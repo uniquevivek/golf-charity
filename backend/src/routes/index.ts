@@ -6,6 +6,7 @@ import * as razorpayController from '../controllers/razorpay.controller';
 import * as drawController from '../controllers/draw.controller';
 import * as winnerController from '../controllers/winner.controller';
 import * as adminController from '../controllers/admin.controller';
+import * as donationController from '../controllers/donation.controller';
 import { upload } from '../services/cloudinary.service';
 
 const router = Router();
@@ -28,6 +29,7 @@ router.delete('/scores/:id', requireAuth, scoresController.deleteScore);
 // Charity Routes
 // ==========================================
 // Public
+// We support queries for searching and filtering here
 router.get('/charities', charityController.getCharities);
 router.get('/charities/:id', charityController.getCharityById);
 
@@ -47,6 +49,12 @@ router.get('/subscriptions/active', requireAuth, razorpayController.getActiveSub
 router.post('/subscriptions/checkout', requireAuth, razorpayController.createOrder);
 router.post('/subscriptions/verify-payment', requireAuth, razorpayController.verifyPayment);
 router.post('/subscriptions/cancel', requireAuth, razorpayController.cancelSubscription);
+
+// ==========================================
+// Standalone Donation Routes
+// ==========================================
+router.post('/donations/checkout', requireAuth, donationController.createDonationOrder);
+router.post('/donations/verify', requireAuth, donationController.verifyDonationPayment);
 
 // ==========================================
 // Draw Routes
@@ -79,6 +87,12 @@ router.get('/admin/analytics', requireAuth, requireAdmin, adminController.getAna
 router.get('/admin/users', requireAuth, requireAdmin, adminController.getUsers);
 router.put('/admin/users/:id', requireAuth, requireAdmin, adminController.updateUser);
 router.delete('/admin/users/:id', requireAuth, requireAdmin, adminController.deleteUser);
+
+// Admin Score & Subscription overrides
+router.post('/admin/users/:userId/scores', requireAuth, requireAdmin, adminController.adminAddUserScore);
+router.put('/admin/scores/:scoreId', requireAuth, requireAdmin, adminController.adminUpdateUserScore);
+router.delete('/admin/scores/:scoreId', requireAuth, requireAdmin, adminController.adminDeleteUserScore);
+router.put('/admin/users/:userId/subscription', requireAuth, requireAdmin, adminController.adminUpdateUserSubscription);
 
 // Admin Winner Management
 router.get('/admin/winners', requireAuth, requireAdmin, winnerController.getAllWinners);

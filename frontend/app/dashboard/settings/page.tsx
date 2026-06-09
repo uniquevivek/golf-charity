@@ -1,19 +1,44 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/authStore';
 import { api } from '../../../lib/api';
 import Link from 'next/link';
 import { Settings, CreditCard, ShieldCheck, AlertCircle, Check } from 'lucide-react';
 
+interface ActiveSubscription {
+  id: string;
+  plan: 'MONTHLY' | 'YEARLY';
+  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
+  amount: number;
+  endDate: string | null;
+}
+
 export default function UserSettingsPage() {
   const { user } = useAuthStore();
+  const [subscription, setSubscription] = useState<ActiveSubscription | null>(null);
+  const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Simplified subscription check
-  const activeSub = user?.donationPercentage !== undefined; // mock user status
+  const fetchSubscription = async () => {
+    setLoading(true);
+    try {
+      const data = await api.get('/subscriptions/active');
+      setSubscription(data.subscription || null);
+    } catch (err: any) {
+      console.error('Failed to load subscription status:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSubscription();
+  }, []);
+
+  const activeSub = subscription?.status === 'ACTIVE';
   
   const handleCancelSubscription = async () => {
     if (!confirm('Are you sure you want to cancel your subscription billing? You will retain access until the end of your billing cycle.')) {
@@ -27,6 +52,7 @@ export default function UserSettingsPage() {
     try {
       const response = await api.post('/subscriptions/cancel');
       setSuccess(response.message || 'Subscription successfully cancelled.');
+      await fetchSubscription();
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Failed to cancel subscription billing');
@@ -59,34 +85,64 @@ export default function UserSettingsPage() {
             Subscription Plan details
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-1">
-              <p className="text-xs text-muted-foreground">Current Plan</p>
-              <p className="text-xl font-black text-white">Annual Supporter</p>
+          {loading ? (
+            <div className="py-12 flex justify-center">
+              <span className="w-8 h-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin"></span>
             </div>
-            <div className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-1">
-              <p className="text-xs text-muted-foreground">Pricing Tier</p>
-              <p className="text-xl font-black text-white">$290 / year</p>
-            </div>
-            <div className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-1">
-              <p className="text-xs text-muted-foreground">Next Renewal</p>
-              <p className="text-sm font-bold text-white">June 20, 2027</p>
-            </div>
-            <div className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-1">
-              <p className="text-xs text-muted-foreground">Status</p>
-              <p className="text-sm font-bold text-primary">Active (Auto-renew)</p>
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-1">
+                  <p className="text-xs text-muted-foreground">Current Plan</p>
+                  <p className="text-xl font-black text-white">
+                    {activeSub
+                      ? (subscription?.plan === 'MONTHLY' ? 'Monthly Golfer' : 'Annual Supporter')
+                      : 'No Active Subscription'}
+                  </p>
+                </div>
+                <div className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-1">
+                  <p className="text-xs text-muted-foreground">Pricing Tier</p>
+                  <p className="text-xl font-black text-white">
+                    {activeSub
+                      ? `₹${subscription?.amount.toFixed(2)}`
+                      : '—'}
+                  </p>
+                </div>
+                <div className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-1">
+                  <p className="text-xs text-muted-foreground">Next Renewal / Expiry</p>
+                  <p className="text-sm font-bold text-white">
+                    {activeSub && subscription?.endDate
+                      ? new Date(subscription.endDate).toLocaleDateString(undefined, {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })
+                      : '—'}
+                  </p>
+                </div>
+                <div className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-1">
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <p className={`text-sm font-bold ${activeSub ? 'text-primary' : 'text-red-400'}`}>
+                    {activeSub
+                      ? (subscription?.status === 'CANCELLED' ? 'Cancelled (Pending Expiry)' : 'Active (Auto-renew)')
+                      : 'Inactive'}
+                  </p>
+                </div>
+              </div>
 
-          <div className="pt-6 border-t border-border flex justify-end">
-            <button
-              onClick={handleCancelSubscription}
-              disabled={cancelling}
-              className="px-6 py-3 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 text-sm font-semibold transition-all disabled:opacity-50"
-            >
-              {cancelling ? 'Processing...' : 'Cancel Subscription'}
-            </button>
-          </div>
+              {activeSub && subscription?.status !== 'CANCELLED' && (
+                <div className="pt-6 border-t border-border flex justify-end">
+                  <button
+                    onClick={handleCancelSubscription}
+                    disabled={cancelling}
+                    className="px-6 py-3 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 text-sm font-semibold transition-all disabled:opacity-50"
+                  >
+                    {cancelling ? 'Processing...' : 'Cancel Subscription'}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* Informational sidebar */}

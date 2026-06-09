@@ -40,15 +40,11 @@ export default function DashboardOverview() {
         const scoreData = await api.get('/scores').catch(() => []);
         setScores(scoreData);
 
-        // Fetch winnings to identify subscription or make a call to check subscriptions
-        // Let's get active user details to see subscriptions
-        // A simple query to get user winnings and details:
-        const userWinnings = await api.get('/winners/me').catch(() => []);
-
-        // We can fetch subscriptions list to find the active one
-        // Let's make an endpoint check or approximate from the mock profiles:
-        // For simplicity, we query the user fields.
-        // Let's call the api to get subscriptions or approximate
+        // Fetch active subscription
+        const subData = await api.get('/subscriptions/active').catch(() => null);
+        if (subData && subData.subscription) {
+          setSubscription(subData.subscription);
+        }
       } catch (err) {
         console.error('Error fetching dashboard overview data:', err);
       } finally {
@@ -59,11 +55,7 @@ export default function DashboardOverview() {
     fetchDashboardData();
   }, []);
 
-  const activeSub = user?.selectedCharityId !== undefined; // simplified check or we can inspect active user subscriptions
-  // Let's inspect if the user has an active subscription:
-  // In our schema, we can look for any subscription.
-  // Let's define a mock subscription check:
-  const mockSubActive = user?.donationPercentage !== undefined; // user exists, so let's mock subscription info for visual purposes if database syncing is in sandbox
+  const activeSub = subscription?.status === 'ACTIVE';
 
   // Calculate average score
   const avgScore = scores.length > 0 
@@ -73,7 +65,7 @@ export default function DashboardOverview() {
   return (
     <div className="space-y-8">
       {/* Alert if not subscribed */}
-      {scores.length === 0 && (
+      {!activeSub && (
         <div className="glass p-6 rounded-2xl border border-amber-500/20 bg-amber-500/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex gap-3">
             <AlertTriangle className="text-amber-500 flex-shrink-0 mt-0.5" size={20} />
@@ -100,13 +92,33 @@ export default function DashboardOverview() {
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-xs font-semibold text-muted-foreground">My Subscription</span>
-              <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded bg-primary/20 text-primary border border-primary/20">
-                Active
+              <span className={`px-2 py-0.5 text-[10px] font-black uppercase rounded ${
+                activeSub
+                  ? 'bg-primary/20 text-primary border border-primary/20'
+                  : 'bg-red-500/20 text-red-400 border border-red-500/20'
+              }`}>
+                {activeSub ? 'Active' : 'Inactive'}
               </span>
             </div>
-            <p className="text-2xl font-black text-white">Yearly Supporter</p>
+            <p className="text-2xl font-black text-white">
+              {activeSub
+                ? (subscription?.plan === 'MONTHLY' ? 'Monthly Golfer' : 'Annual Supporter')
+                : 'No Active Subscription'}
+            </p>
             <p className="text-xs text-muted-foreground">
-              Next billing date: <span className="text-white font-semibold">June 2027</span>
+              {activeSub && subscription?.endDate ? (
+                <>
+                  Next billing date: <span className="text-white font-semibold">
+                    {new Date(subscription.endDate).toLocaleDateString(undefined, {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </span>
+                </>
+              ) : (
+                'No active billing cycle'
+              )}
             </p>
           </div>
           <Link

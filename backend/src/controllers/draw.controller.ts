@@ -169,6 +169,29 @@ export async function publishDraw(req: AuthenticatedRequest, res: Response) {
       data: { published: true },
     });
 
+    // Alert all active subscribers
+    try {
+      const activeUsers = await prisma.user.findMany({
+        where: {
+          subscriptions: {
+            some: { status: 'ACTIVE' }
+          }
+        },
+        select: { email: true }
+      });
+      const emails = activeUsers.map((u) => u.email);
+      if (emails.length > 0) {
+        const emailService = require('../services/email.service');
+        emailService.sendDrawPublishedAlert(emails, {
+          month: updatedDraw.month,
+          year: updatedDraw.year,
+          numbers: updatedDraw.drawNumbers
+        }).catch((err: any) => console.error('Failed to send draw publish email alert:', err));
+      }
+    } catch (emailErr) {
+      console.error('Error fetching subscribers for email alerts:', emailErr);
+    }
+
     res.json({
       message: 'Draw published successfully',
       draw: updatedDraw,

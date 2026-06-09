@@ -50,6 +50,7 @@ model User {
   subscriptions       Subscription[]
   scores              Score[]
   winners             Winner[]
+  donations           Donation[]
 }
 
 model Subscription {
@@ -68,14 +69,16 @@ model Subscription {
 }
 
 model Charity {
-  id          String   @id @default(uuid())
+  id          String     @id @default(uuid())
   name        String
   description String
-  image       String   @default("https://images.unsplash.com/photo-1542601906990-b4d3fb778b09")
+  image       String     @default("https://images.unsplash.com/photo-1542601906990-b4d3fb778b09")
   website     String?
-  featured    Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  featured    Boolean    @default(false)
+  events      String[]   @default([])
+  createdAt   DateTime   @default(now())
   users       User[]
+  donations   Donation[]
 }
 
 model Score {
@@ -109,4 +112,15 @@ model Winner {
   status      WinnerStatus @default(PENDING)
   proofImage  String?
   createdAt   DateTime     @default(now())
+}
+
+model Donation {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  charityId String
+  charity   Charity  @relation(fields: [charityId], references: [id])
+  amount    Float
+  paymentId String
+  createdAt DateTime @default(now())
 }

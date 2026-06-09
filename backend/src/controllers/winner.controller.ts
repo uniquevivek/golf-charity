@@ -130,6 +130,25 @@ export async function approveWinner(req: AuthenticatedRequest, res: Response) {
       data: { status: 'APPROVED' },
     });
 
+    // Alert the user via email
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: updatedWinner.userId },
+        select: { email: true, fullName: true },
+      });
+      if (user) {
+        const emailService = require('../services/email.service');
+        emailService.sendWinnerAlert(
+          user.email,
+          user.fullName || 'Golfer',
+          updatedWinner.prizeAmount,
+          updatedWinner.matchCount
+        ).catch((err: any) => console.error('Failed to send winner email alert:', err));
+      }
+    } catch (emailErr) {
+      console.error('Error triggering winner email alert:', emailErr);
+    }
+
     res.json({
       message: 'Winner proof approved successfully',
       winner: updatedWinner,

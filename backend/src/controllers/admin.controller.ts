@@ -106,6 +106,12 @@ export async function getUsers(req: AuthenticatedRequest, res: Response) {
         selectedCharity: {
           select: { name: true },
         },
+        scores: {
+          orderBy: [
+            { scoreDate: 'desc' },
+            { createdAt: 'desc' },
+          ],
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -180,5 +186,191 @@ export async function deleteUser(req: AuthenticatedRequest, res: Response) {
   } catch (error) {
     console.error('Error deleting user:', error);
     res.status(500).json({ error: 'Failed to delete user' });
+  }
+}
+
+// Admin: Add score on behalf of a user
+export async function adminAddUserScore(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { userId } = req.params;
+    const { score, scoreDate } = req.body;
+
+    const parsedScore = parseInt(score, 10);
+    if (isNaN(parsedScore) || parsedScore < 1 || parsedScore > 45) {
+      return res.status(400).json({ error: 'Score must be an integer between 1 and 45' });
+    }
+
+    const parsedDate = new Date(scoreDate);
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid score date' });
+    }
+
+    // Add score
+    const newScore = await prisma.score.create({
+      data: {
+        userId,
+        score: parsedScore,
+        scoreDate: parsedDate,
+      },
+    });
+
+    // Enforce 5-score limit
+    const allScores = await prisma.score.findMany({
+      where: { userId },
+      orderBy: [
+        { scoreDate: 'desc' },
+        { createdAt: 'desc' },
+      ],
+    });
+
+    if (allScores.length > 5) {
+      const excessScores = allScores.slice(5);
+      const excessIds = excessScores.map((s) => s.id);
+      
+      await prisma.score.deleteMany({
+        where: { id: { in: excessIds } },
+      });
+    }
+
+    res.status(201).json({
+      message: 'Score card added successfully by admin',
+      score: newScore,
+    });
+  } catch (error) {
+    console.error('Error admin adding score:', error);
+    res.status(500).json({ error: 'Failed to add user score card' });
+  }
+}
+
+// Admin: Edit specific score card
+export async function adminUpdateUserScore(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { scoreId } = req.params;
+    const { score, scoreDate } = req.body;
+
+    const scoreCard = await prisma.score.findUnique({
+      where: { id: scoreId },
+    });
+
+    if (!scoreCard) {
+      return res.status(404).json({ error: 'Score card not found' });
+    }
+
+    const parsedScore = parseInt(score, 10);
+    if (isNaN(parsedScore) || parsedScore < 1 || parsedScore > 45) {
+      return res.status(400).json({ error: 'Score must be an integer between 1 and 45' });
+    }
+
+    const parsedDate = new Date(scoreDate);
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid score date' });
+    }
+
+    const updatedScore = await prisma.score.update({
+      where: { id: scoreId },
+      data: {
+        score: parsedScore,
+        scoreDate: parsedDate,
+      },
+    });
+
+    res.json({
+      message: 'Score card updated successfully by admin',
+      score: updatedScore,
+    });
+  } catch (error) {
+    console.error('Error admin updating score:', error);
+    res.status(500).json({ error: 'Failed to update user score card' });
+  }
+}
+
+// Admin: Delete specific score card
+export async function adminDeleteUserScore(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { scoreId } = req.params;
+
+    const scoreCard = await prisma.score.findUnique({
+      where: { id: scoreId },
+    });
+
+    if (!scoreCard) {
+      return res.status(404).json({ error: 'Score card not found' });
+    }
+
+    await prisma.score.delete({
+      where: { id: scoreId },
+    });
+
+    res.json({ message: 'Score card deleted successfully by admin' });
+  } catch (error) {
+    console.error('Error admin deleting score:', error);
+    res.status(500).json({ error: 'Failed to delete score card' });
+  }
+}
+
+// Admin: Override user subscription details
+export async function adminUpdateUserSubscription(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { userId } = req.params;
+    const { plan, status, amount, endDate } = req.body;
+
+    if (plan !== 'MONTHLY' && plan !== 'YEARLY') {
+      return res.status(400).json({ error: 'Subscription plan must be MONTHLY or YEARLY' });
+    }
+
+    if (status !== 'ACTIVE' && status !== 'EXPIRED' && status !== 'CANCELLED') {
+      return res.status(400).json({ error: 'Subscription status must be ACTIVE, EXPIRED, or CANCELLED' });
+    }
+
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount < 0) {
+      return res.status(400).json({ error: 'Amount must be a non-negative number' });
+    }
+
+    const parsedEndDate = new Date(endDate);
+    if (isNaN(parsedEndDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid subscription end date' });
+    }
+
+    // Find any existing active/expired/cancelled subscription for user
+    const existingSub = await prisma.subscription.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let subscription;
+    if (existingSub) {
+      subscription = await prisma.subscription.update({
+        where: { id: existingSub.id },
+        data: {
+          plan,
+          status,
+          amount: parsedAmount,
+          endDate: parsedEndDate,
+        },
+      });
+    } else {
+      // Create new override subscription
+      subscription = await prisma.subscription.create({
+        data: {
+          userId,
+          plan,
+          status,
+          amount: parsedAmount,
+          stripeCustomerId: 'cus_admin_override',
+          stripeSubscriptionId: 'sub_admin_override_' + Math.random().toString(36).substring(7),
+          startDate: new Date(),
+          endDate: parsedEndDate,
+        },
+      });
+    }
+
+    res.json({
+      message: 'User subscription overridden successfully by admin',
+      subscription,
+    });
+  } catch (error) {
+    console.error('Error admin overriding subscription:', error);
+    res.status(500).json({ error: 'Failed to override user subscription parameters' });
   }
 }
