@@ -23,16 +23,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const isLoginPage = pathname === '/admin';
+
   useEffect(() => {
     if (!isLoading) {
-      if (!isAuthenticated) {
-        router.push('/login?redirect=admin');
-      } else if (user?.role !== 'ADMIN') {
-        // Redirect standard users back to standard dashboard
-        router.push('/dashboard');
+      if (isLoginPage) {
+        if (isAuthenticated) {
+          if (user?.role === 'ADMIN') {
+            router.push('/admin/analytics');
+          } else {
+            router.push('/dashboard');
+          }
+        }
+      } else {
+        if (!isAuthenticated) {
+          router.push('/admin');
+        } else if (user?.role !== 'ADMIN') {
+          // Redirect standard users back to standard dashboard
+          router.push('/dashboard');
+        }
       }
     }
-  }, [isAuthenticated, isLoading, user, router]);
+  }, [isAuthenticated, isLoading, user, router, isLoginPage]);
 
   if (isLoading) {
     return (
@@ -43,6 +55,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </div>
     );
+  }
+
+  if (isLoginPage) {
+    if (isAuthenticated) {
+      return null;
+    }
+    return <>{children}</>;
   }
 
   if (!isAuthenticated || user?.role !== 'ADMIN') {
